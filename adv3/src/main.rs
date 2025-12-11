@@ -102,6 +102,7 @@ fn step2_find_digit_and_position(battery_pack:&[u32],digit:u32,min_digits_remain
     for position in 0..=battery_pack.len()-min_digits_remaining{
         if battery_pack[position]==digit {
             result.push(position);
+            break;
         }
     }
     return result;
