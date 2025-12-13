@@ -1,7 +1,5 @@
 use std::{ collections::HashSet, error::Error};
 
-mod range_set;
-
 fn main() -> Result<(), Box<dyn Error>> {
     let content = std::fs::read_to_string("input.txt")?;
     let input = parse_content(&content)?;
