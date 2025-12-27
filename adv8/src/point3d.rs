@@ -9,10 +9,10 @@ pub struct Point3D{
 
 
 impl Point3D {
-    pub fn dist_other_squared(self: &Point3D, other: &Point3D) -> u32 {
-        let dx = self.x.abs_diff(other.x);
-        let dy = self.y.abs_diff(other.y);
-        let dz = self.z.abs_diff(other.z);
+    pub fn dist_other_squared(self: &Point3D, other: &Point3D) -> u128 {
+        let dx = self.x.abs_diff(other.x) as u128;
+        let dy = self.y.abs_diff(other.y) as u128;
+        let dz = self.z.abs_diff(other.z) as u128;
         dx.pow(2) + dy.pow(2) + dz.pow(2)
     }
     
