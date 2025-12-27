@@ -7,6 +7,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let content = read_to_string("input.txt")?;
     let points=parse_content(&content)?;
     println!("step 1 {}",step1(&points,1000));
+    println!("step 2 {}",step2(&points));
     Ok(())
 }
 
@@ -68,6 +69,56 @@ fn step1(points:&[Point3D],circuits_to_connect:usize)->u128{
     circuit_count_vec.iter().take(3).fold(1, |acc,v|(*v) as u128 * acc)
 }
 
+
+fn step2(points:&[Point3D])->u128{
+    let mut distances: BTreeMap<u128,(Point3D,Point3D)>=BTreeMap::new();
+    for first in 0..points.len()-1{
+        let first_point=points[first];
+        for second in first+1..points.len(){
+            let second_point=points[second];
+            distances.insert(first_point.dist_other_squared(&second_point),(first_point,second_point));
+        }
+    }
+
+    let mut circuits: HashMap<Point3D,u32>=HashMap::new();
+    let mut circuit_number=0_u32;
+
+    for (first_point,second_point) in distances.values(){
+        match(circuits.get(first_point).cloned(),circuits.get(second_point).cloned()){
+            (Some(first_circuit),Some(second_circuit))=>{
+                let lower_value=first_circuit.min(second_circuit);
+                let upper_value=first_circuit.max(second_circuit);
+                if lower_value!=upper_value{
+                    for (_,value) in circuits.iter_mut(){
+                        if *value == upper_value{
+                            *value=lower_value;
+                        }
+                    }
+                }
+            }
+            (None,Some(circuit))=>{
+                circuits.insert(*first_point, circuit);
+            }
+            (Some(circuit),None)=>{
+                circuits.insert(*second_point, circuit);
+            }
+            (None,None)=>{
+                let circuit=circuit_number;
+                circuit_number+=1;
+                circuits.insert(*first_point, circuit);
+                circuits.insert(*second_point, circuit);
+            }
+        }
+        if circuits.len()==points.len(){
+            if circuits.values().all(|v|*v==0){
+                return first_point.x as u128 * second_point.x as u128
+            }
+        }
+
+    }
+    0
+
+}
 
 
 
