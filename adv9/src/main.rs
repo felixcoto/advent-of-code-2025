@@ -39,16 +39,38 @@ fn step2(points:&[Point2D])->Option<u128>{
             for second_index in first_index+1..points.len(){
                 let first_point=points[first_index];
                 let second_point=points[second_index];
-                let opposite_line=Line2D{
-                    origin:Point2D { x: first_point.x, y: second_point.y },
-                    dest: Point2D { x: second_point.x, y: first_point.y }
-                };
-                if !polygon_intersects(points, &opposite_line){
-                    let current_area=first_point.area_other_tiles(&second_point);
-                    result=Some(result.map_or(current_area, |v: u128|v.max(current_area)));
-                    //println!("Found potential rectangle with area {} between {:?} and {:?}, line checked {:?}", current_area, first_point, second_point,opposite_line);
-                } else {
-                    //println!("Skipping intersection check for points {:?} and {:?}, line checked {:?}", first_point, second_point,opposite_line);
+                let current_area=first_point.area_other_tiles(&second_point);
+                if result.is_none() || result.unwrap()<current_area {
+                    let mut debug = false;
+                    if current_area==1613305596{
+                        println!("Found potential result at {:?} and {:?}",first_point,second_point);
+                        debug=true;
+                    }
+                    let lines_to_check=[
+                        first_point.clone(),
+                        Point2D { x: first_point.x, y: second_point.y },
+                        second_point.clone(),
+                        Point2D { x: second_point.x, y: first_point.y }
+                    ];
+                    let mut intesect = false;
+                    for third_index in 0..lines_to_check.len() {
+                        let current_line=Line2D{
+                            origin:lines_to_check[third_index],
+                            dest:lines_to_check[(third_index+1)%lines_to_check.len()]
+                        };
+                        
+                        intesect=polygon_intersects(points, &current_line,debug);
+                        if intesect {break;}
+                    }
+
+                    
+                    if !intesect{
+                        
+                        result=Some(current_area);
+                        //println!("Found potential rectangle with area {} between {:?} and {:?}, line checked {:?}", current_area, first_point, second_point,opposite_line);
+                    } else {
+                        //println!("Skipping intersection check for points {:?} and {:?}, line checked {:?}", first_point, second_point,opposite_line);
+                    }
                 }
             }
         }
@@ -62,6 +84,10 @@ pub struct Line2D{
 
 impl Line2D{
     pub fn check_only_one_intersect(&self, other: &Line2D) -> bool {
+        self.check_only_one_intersect_d(other, false)
+    }
+
+    pub fn check_only_one_intersect_d(&self, other: &Line2D,debug:bool) -> bool {
         let o1 = get_orientation(&self.origin, &self.dest, &other.origin);
         let o2 = get_orientation(&self.origin, &self.dest, &other.dest);
         let o3 = get_orientation(&other.origin, &other.dest, &self.origin);
@@ -75,8 +101,15 @@ impl Line2D{
         // Si o4 es 0, mi dest está sobre la recta de la otra línea.
         let es_mi_extremo = (o3 == 0) || (o4 == 0);
 
+        if debug {
+            println!("o1: {}, o2: {}, o3: {}, o4: {}", o1, o2, o3, o4);
+            println!("intersectan: {}", intersectan);
+            println!("es_mi_extremo: {}", es_mi_extremo);
+        }
+
         // Queremos que intersecten, pero que NO sea en mi extremo
         intersectan && !es_mi_extremo
+
     }
 
 }
@@ -89,15 +122,26 @@ fn get_orientation(p:&Point2D,q:&Point2D, r:&Point2D)->u8{
     if val==0 {return 0;}// Colineales
     else if val > 0 {1} else {2} // 1: Clockwise, 2: Counterclockwise
 }
-fn polygon_intersects(points:&[Point2D],line:&Line2D) -> bool {
+fn polygon_intersects(points:&[Point2D],line:&Line2D,debug:bool) -> bool {
     let mut result=false;
     for first_index in 0..points.len(){
         let pol_line=Line2D{
             origin:points[first_index].clone(),
             dest:points[if first_index==(points.len()-1) {0} else{first_index+1}].clone()
         };
-        result=line.check_only_one_intersect(&pol_line);
-        if result {break;}
+        let mut debug_line=false;
+        if debug && first_index==217{
+            debug_line=true;
+
+        }
+        result=line.check_only_one_intersect_d(&pol_line,debug_line);
+        
+        if result {
+            if debug{
+                println!("Intersection found index {:?} line {:?}",first_index, pol_line);
+            }
+            break;
+        }
     }
     result
         
@@ -296,7 +340,7 @@ mod tests {
         let content = fs::read_to_string("test.txt")?;
         let points = parse_content(&content)?;
         let line=Line2D { origin: Point2D { x: 11, y: 3 }, dest: Point2D { x: 7, y: 7 } };
-        let result=polygon_intersects(&points, &line);
+        let result=polygon_intersects(&points, &line, true);
         assert_eq!(true,result);
         Ok(())
     }

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Polígono + rectángulo + línea (zoom interactivo)</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    #wrap { height: 100%; display: flex; flex-direction: column; }
+    #bar { padding: 10px 12px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #ddd; }
+    #plot { flex: 1; }
+    .hint { opacity: .75; font-size: 13px; }
+    button { padding: 6px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="bar">
+      <button id="reset">Reset vista</button>
+      <button id="zoomLine">Zoom a la línea</button>
+      <span class="hint">Zoom: rueda | Pan: arrastrar | Caja zoom: botón “zoom” en la barra de Plotly</span>
+    </div>
+    <div id="plot"></div>
+  </div>
+
+  <script>
+    // === Config original (tus datos) ===
+    const rectOpp1 = { x: 6165,  y: 68497 };
+    const rectOpp2 = { x: 94671, y: 50270 };
+
+    const lineP1 = { x: 6165, y: 67407 };
+    const lineP2 = { x: 5643, y: 67407 };
+
+    // Lee input.txt (formato: "x,y" por línea)
+    async function loadPoints(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`No se pudo cargar ${url}: ${res.status}`);
+      const text = await res.text();
+
+      const pts = [];
+      for (const raw of text.split(/\r?\n/)) {
+        const line = raw.trim();
+        if (!line) continue;
+        const [xs, ys] = line.split(",").map(s => s.trim());
+        const x = Number(xs), y = Number(ys);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        pts.push({ x, y });
+      }
+      return pts;
+    }
+
+    function rectCornersFromOpp(a, b) {
+      const xmin = Math.min(a.x, b.x), xmax = Math.max(a.x, b.x);
+      const ymin = Math.min(a.y, b.y), ymax = Math.max(a.y, b.y);
+      // Orden para cerrar el polígono del rectángulo
+      return [
+        {x: xmin, y: ymax},
+        {x: xmax, y: ymax},
+        {x: xmax, y: ymin},
+        {x: xmin, y: ymin},
+        {x: xmin, y: ymax},
+      ];
+    }
+
+    function toXY(arr) {
+      return {
+        x: arr.map(p => p.x),
+        y: arr.map(p => p.y),
+      };
+    }
+
+    function buildTraces(points) {
+      // Cerrar polígono (último -> primero)
+      const closed = points.length ? [...points, points[0]] : [];
+
+      const polyXY = toXY(closed);
+      const ptsXY  = toXY(points);
+
+      const rectCorners = rectCornersFromOpp(rectOpp1, rectOpp2);
+      const rectXY = toXY(rectCorners);
+
+      // Polígono en línea
+      const polygonLine = {
+        type: "scatter",
+        mode: "lines",
+        name: "Polígono (línea)",
+        x: polyXY.x,
+        y: polyXY.y,
+        line: { width: 2 }
+      };
+
+      // Puntos del polígono
+      const polygonPoints = {
+        type: "scatter",
+        mode: "markers",
+        name: "Puntos del polígono",
+        x: ptsXY.x,
+        y: ptsXY.y,
+        marker: { size: 4 }
+      };
+
+      // Rectángulo relleno (sólido)
+      const rectangle = {
+        type: "scatter",
+        mode: "lines",
+        name: "Rectángulo (sólido)",
+        x: rectXY.x,
+        y: rectXY.y,
+        fill: "toself",
+        fillcolor: "rgba(255, 165, 0, 0.25)",
+        line: { width: 3 }
+      };
+
+      // Línea original
+      const originalLine = {
+        type: "scatter",
+        mode: "lines+markers",
+        name: "Línea original",
+        x: [lineP1.x, lineP2.x],
+        y: [lineP1.y, lineP2.y],
+        line: { width: 4 },
+        marker: { size: 8 }
+      };
+
+      return [rectangle, polygonLine, polygonPoints, originalLine];
+    }
+
+    function defaultLayout() {
+      return {
+        title: "Polígono + rectángulo + línea (zoom interactivo)",
+        xaxis: { title: "X" },
+        yaxis: { title: "Y", scaleanchor: "x", scaleratio: 1 }, // aspecto 1:1
+        legend: { orientation: "h" },
+        margin: { l: 60, r: 20, t: 60, b: 60 },
+      };
+    }
+
+    function zoomToLine(gd) {
+      // Ventana alrededor de la línea
+      const cx = (lineP1.x + lineP2.x) / 2;
+      const cy = lineP1.y;
+      const marginX = 5000;
+      const marginY = 3000;
+
+      Plotly.relayout(gd, {
+        "xaxis.range": [cx - marginX, cx + marginX],
+        "yaxis.range": [cy - marginY, cy + marginY],
+      });
+    }
+
+    async function main() {
+      const points = await loadPoints("input.txt");
+
+      const traces = buildTraces(points);
+      const layout = defaultLayout();
+
+      const config = {
+        responsive: true,
+        scrollZoom: true, // zoom con rueda
+        displaylogo: false,
+      };
+
+      const gd = document.getElementById("plot");
+      await Plotly.newPlot(gd, traces, layout, config);
+
+      document.getElementById("reset").addEventListener("click", () => {
+        Plotly.relayout(gd, {
+          "xaxis.autorange": true,
+          "yaxis.autorange": true,
+        });
+      });
+
+      document.getElementById("zoomLine").addEventListener("click", () => zoomToLine(gd));
+    }
+
+    main().catch(err => {
+      console.error(err);
+      document.getElementById("plot").innerHTML =
+        `<div style="padding:16px;color:#b00">
+           Error: ${String(err.message || err)}
+           <br><br>
+           Nota: abre esto con un servidor local (no file://). Ejemplo:
+           <pre>python -m http.server</pre>
+         </div>`;
+    });
+  </script>
+</body>
+</html>
