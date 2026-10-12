@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
-public record Machine(BitSet objetive, List<List<Integer>> buttons, List<Integer>joltRequeriments) {
+public record Machine(int numberOfLights,BitSet objetive, List<List<Integer>> buttons, List<Integer>joltRequeriments) {
     public static Machine parseLine(String line){
 		var objetiveFinalChar=line.indexOf("]");
 		var objetiveChars=line.substring(1, objetiveFinalChar);
@@ -40,6 +40,12 @@ public record Machine(BitSet objetive, List<List<Integer>> buttons, List<Integer
 				.map(Integer::parseInt)
 				.toList();
 
-		return new Machine(objetive, buttons, joltRequirements);
+		return new Machine(objetiveChars.length(), objetive, buttons, joltRequirements);
+	}
+
+	public int calculateDistance(BitSet otherState){
+		return (int) IntStream.range(0, numberOfLights)
+				.filter(pos->objetive.get(pos)!=otherState.get(pos))
+				.count();
 	}
 }

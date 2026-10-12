@@ -3,20 +3,17 @@
 */
 package org.example;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.List;
-import java.util.regex.Pattern;
-import java.util.stream.IntStream;
+import java.io.IOException;
+import java.nio.file.Path;
 
 public class App {
 	public String getGreeting() {
 		return "Hello World!";
 	}
 	
-	public static void main(String[] args) {
-		System.out.println(new App().getGreeting());
+	public static void main(String[] args) throws Exception {
+		var inputPath=Path.of(App.class.getResource("/input.txt").toURI());
+		System.out.println(String.format("Step 1: %d",Step1.resolve(inputPath)));
 	}
 	
 	
