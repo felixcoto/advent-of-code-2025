@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
+import com.google.common.primitives.Ints;
+
 public record Machine(int numberOfLights,BitSet objetive, List<List<Integer>> buttons, List<Integer>joltRequeriments) {
     public static Machine parseLine(String line){
 		var objetiveFinalChar=line.indexOf("]");
@@ -44,8 +46,31 @@ public record Machine(int numberOfLights,BitSet objetive, List<List<Integer>> bu
 	}
 
 	public int calculateDistance(BitSet otherState){
-		return (int) IntStream.range(0, numberOfLights)
+		return (int) IntStream.range(0, Math.max(objetive.length(), otherState.length()))
 				.filter(pos->objetive.get(pos)!=otherState.get(pos))
 				.count();
+	}
+
+	public int calculateDistanceJoltageFromButtonState(List<Integer>  buttonState){
+		return calculateDistanceJoltageFromJoltState(calculateJoltState(buttonState));
+		
+	}
+
+	public int calculateDistanceJoltageFromJoltState(List<Integer>  joltState){
+		return IntStream.range(0, joltRequeriments.size())
+			.map(pos->joltRequeriments.get(pos)-joltState.get(pos))
+			.sum();
+	}
+
+	public List<Integer> calculateJoltState(List<Integer> buttonState) {
+		var array=new Integer[joltRequeriments.size()];
+		for (var buttonIndex=0;buttonIndex<buttonState.size();buttonIndex++){
+			var button=buttons.get(buttonIndex);
+			var buttonPushCount=buttonState.get(buttonIndex);
+			for (var joltPos:button){
+				array[joltPos]+=buttonPushCount;
+			}
+		}
+		return Arrays.asList(array);
 	}
 }
