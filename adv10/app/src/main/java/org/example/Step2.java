@@ -1,18 +1,16 @@
 package org.example;
 
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NavigableMap;
 import java.util.Set;
-import java.util.stream.LongStream;
-
-import org.jspecify.annotations.NonNull;
+import java.util.TreeMap;
+import java.util.stream.IntStream;
 
 public class Step2 {
 
@@ -24,6 +22,7 @@ public class Step2 {
         var results=machines
                 .stream()
                 .mapToLong(Step2::findCombination)
+                .peek(combination->System.out.println("Step2 result "+combination))
                 .boxed().toList();
        /*  if (results.size()!=170){
             throw new RuntimeException(String.format("Invalid number of results: %d",results.size()));
@@ -32,57 +31,70 @@ public class Step2 {
     }
 
     public static int findCombination(Machine machine) {
-        return findCombinationComplete(machine).size();
+        return findCombinationComplete(machine).stream().mapToInt(val->val).sum();
     }
 
-    public static List<List<Integer>> findCombinationComplete(Machine machine) {
-        List<FindStateWithHeuristic> pendingStates = new ArrayList<>();
-        Set<BitSet> viewedStates = new HashSet<>();
-        for (var button : machine.buttons()) {
-            var findState = new FindState(new BitSet(machine.objetive().length()), new ArrayList<>(), button);
-            addStateToMap(machine, pendingStates, button, findState);
+    public static List<Integer> findCombinationComplete(Machine machine) {
+        NavigableMap<Integer,List<FindStateWithHeuristic>> pendingStates = new TreeMap<>();
+        Set<List<Integer>> viewedStates = new HashSet<>();
+        
+        {
+            var initialState=new ArrayList<Integer>(machine.buttons().size());
+            IntStream.range(0, machine.buttons().size()).forEach(_->initialState.add(0));
+            var initialStateWithHeuristic=new FindStateWithHeuristic(machine.calculateDistanceJoltageFromButtonState(initialState), new FindState(initialState, new Action(0, 0)));
+            addStateToMap(initialStateWithHeuristic, pendingStates);
         }
+       
 
-        Collections.sort(pendingStates);
+        List<Integer> result=null;
+        Integer resultPush=Integer.MAX_VALUE;
         while (true) {
-            var findState = pendingStates.removeFirst().findState;
-            var state = (BitSet) findState.state.clone();
-            List<List<Integer>> buttonSequence=new ArrayList<>(findState.buttonSequence.size()+1);
-            buttonSequence.addAll(findState.buttonSequence);
-            buttonSequence.add(findState.button);
-            findState.button.stream().forEach(pos -> state.flip(pos));
-            if (machine.calculateDistance(state) == 0) {
-                return buttonSequence;
-            } else {
-                if (viewedStates.add(state)) {
-                    for (var button : machine.buttons()) {
-                        var newFindState = new FindState(state, buttonSequence, button);
-                        addStateToMap(machine, pendingStates, button, newFindState);
-                    }
-                    Collections.sort(pendingStates);
-                }
+            var key=pendingStates.firstKey();
+            var oldFindState=pendingStates.get(key).removeFirst().findState;
+            if (pendingStates.get(key).isEmpty()){
+                pendingStates.remove(key);
+            }
 
+            var newState=oldFindState.action.apply(oldFindState.state);
+            if (machine.calculateDistanceJoltageFromButtonState(newState)==0){
+                /*var pushCount=newState.stream().mapToInt(val->val).sum();
+                if (result==null || pushCount<resultPush){
+                    result=newState;
+                    resultPush=pushCount;
+                }*/
+               return newState;
+            }else{
+                if (viewedStates.add(newState)){
+                    expand(newState, machine, pendingStates);
+                }
             }
         }
+        //return result;
     }
 
-    public static List<FindStateWithHeuristic> expand(List<Integer> state, Machine machine, NavigableMap<Integer,List<FindStateWithHeuristic>> map){
+    public static void expand(List<Integer> state, Machine machine, NavigableMap<Integer,List<FindStateWithHeuristic>> map){
         var joltState=machine.calculateJoltState(state);
-        var currentDistance=machine.calculateDistanceJoltageFromButtonState(joltState);
+        var currentDistance=machine.calculateDistanceJoltageFromButtonState(state);
         for (var index=0;index<machine.buttons().size();index++) {
             var button=machine.buttons().get(index);
             if (state.get(index)>0){
                 var action=new Action(index, -1);
-                var nextDistance=currentDistance-button.size();
-                var findStateWithHeuristic=new FindStateWithHeuristic(nextDistance, new FindState(state, action));
+                var nextDistance=currentDistance+(button.size()*action.pushCount);
+                var findStateWithHeuristic=new FindStateWithHeuristic(countPush(state)-1, new FindState(state, action));
                 addStateToMap(findStateWithHeuristic,map);
             }
 
             
             var pushes=button.stream()
                     .mapToInt(pos->machine.joltRequeriments().get(pos)-joltState.get(pos))
-                    .min();
-
+                    .min()
+                    .orElse(0);
+            if (pushes>0){
+                var action=new Action(index, pushes);
+                var nextDistance=currentDistance+(button.size()*action.pushCount);
+                var findStateWithHeuristic=new FindStateWithHeuristic(countPush(state)+pushes, new FindState(state, action));
+                addStateToMap(findStateWithHeuristic,map);
+            }
 
             
         }
@@ -92,12 +104,6 @@ public class Step2 {
             NavigableMap<Integer,List<FindStateWithHeuristic>> map) {
         map.computeIfAbsent(findStateWithHeuristic.heuristic, (_)-> new ArrayList<FindStateWithHeuristic>());
         map.get(findStateWithHeuristic.heuristic).add(findStateWithHeuristic);
-    }
-
-    private static void addStateToMap(Machine machine, List<FindStateWithHeuristic> pendingStates,
-            List<Integer> button, @NonNull FindState findState) {
-        var newCount = findState.buttonSequence.size() + (button.size() == machine.calculateDistance(findState.state) ? 1 : 2);
-        pendingStates.add(new FindStateWithHeuristic(newCount, findState));
     }
 
     public static record FindState(List<Integer> state,  Action action) {
@@ -123,4 +129,7 @@ public class Step2 {
         }
     }
 
+    public static int countPush(List<Integer> state){
+       return  state.stream().mapToInt(val->val).sum();
+    }
 }

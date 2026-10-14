@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 
@@ -31,5 +32,15 @@ class MachineTest {
         var joltReq=List.of(7,5,12,7,2);
         assertEquals(joltReq, machine.joltRequeriments());
 
+    }
+
+    @Test 
+    public void test_distance_jolt(){
+        var line="[...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}";
+        var machine=Machine.parseLine(line);
+
+        var buttonState=Arrays.asList(1,0,1,0,0);
+        var joltDistance=machine.calculateDistanceJoltageFromButtonState(buttonState);
+        assertEquals(7+5+12+7+2-4-2, joltDistance);
     }
 }

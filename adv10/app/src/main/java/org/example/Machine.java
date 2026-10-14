@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import com.google.common.primitives.Ints;
 
@@ -64,6 +66,7 @@ public record Machine(int numberOfLights,BitSet objetive, List<List<Integer>> bu
 
 	public List<Integer> calculateJoltState(List<Integer> buttonState) {
 		var array=new Integer[joltRequeriments.size()];
+		IntStream.range(0, array.length).forEach(pos->array[pos]=0);
 		for (var buttonIndex=0;buttonIndex<buttonState.size();buttonIndex++){
 			var button=buttons.get(buttonIndex);
 			var buttonPushCount=buttonState.get(buttonIndex);
