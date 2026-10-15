@@ -13,6 +13,3 @@ plugins {
 
 rootProject.name = "adv10"
 include("app")
-
-// Source: https://mvnrepository.com/artifact/org.choco-solver/choco-solver
-implementation("org.choco-solver:choco-solver:6.0.2")

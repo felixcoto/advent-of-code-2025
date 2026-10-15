@@ -19,6 +19,8 @@ repositories {
 dependencies {
     // This dependency is used by the application.
     implementation(libs.guava)
+    // Source: https://mvnrepository.com/artifact/org.choco-solver/choco-solver
+    implementation("org.choco-solver:choco-solver:6.0.2")
 }
 
 testing {
@@ -42,3 +44,6 @@ application {
     // Define the main class for the application.
     mainClass = "org.example.App"
 }
+
+
+

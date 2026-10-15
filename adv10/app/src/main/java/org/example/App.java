@@ -14,7 +14,7 @@ public class App {
 	public static void main(String[] args) throws Exception {
 		var inputPath=Path.of(App.class.getResource("/input.txt").toURI());
 		System.out.println(String.format("Step 1: %d",Step1.resolve(inputPath)));
-		System.out.println(String.format("Step 2: %d",Step2.resolve(inputPath)));
+		System.out.println(String.format("Step 2: %d",Step2Choco.resolve(inputPath)));
 	}
 	
 	

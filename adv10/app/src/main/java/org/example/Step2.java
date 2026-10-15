@@ -2,6 +2,7 @@ package org.example;
 
 
 import java.io.IOException;
+import java.lang.ref.Reference;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -10,6 +11,9 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class Step2 {
@@ -35,13 +39,13 @@ public class Step2 {
     }
 
     public static List<Integer> findCombinationComplete(Machine machine) {
-        NavigableMap<Integer,List<FindStateWithHeuristic>> pendingStates = new TreeMap<>();
+        NavigableMap<Integer,List<StateWithHeuristic>> pendingStates = new TreeMap<>();
         Set<List<Integer>> viewedStates = new HashSet<>();
         
         {
             var initialState=new ArrayList<Integer>(machine.buttons().size());
             IntStream.range(0, machine.buttons().size()).forEach(_->initialState.add(0));
-            var initialStateWithHeuristic=new FindStateWithHeuristic(machine.calculateDistanceJoltageFromButtonState(initialState), new FindState(initialState, new Action(0, 0)));
+            var initialStateWithHeuristic=new StateWithHeuristic(estimate(initialState, machine), initialState);
             addStateToMap(initialStateWithHeuristic, pendingStates);
         }
        
@@ -50,38 +54,40 @@ public class Step2 {
         Integer resultPush=Integer.MAX_VALUE;
         while (true) {
             var key=pendingStates.firstKey();
-            var oldFindState=pendingStates.get(key).removeFirst().findState;
+            var buttonState=pendingStates.get(key).removeFirst().buttonState;
             if (pendingStates.get(key).isEmpty()){
                 pendingStates.remove(key);
             }
 
-            var newState=oldFindState.action.apply(oldFindState.state);
-            if (machine.calculateDistanceJoltageFromButtonState(newState)==0){
+            
+            if (machine.calculateDistanceJoltageFromButtonState(buttonState)==0){
                 /*var pushCount=newState.stream().mapToInt(val->val).sum();
                 if (result==null || pushCount<resultPush){
                     result=newState;
                     resultPush=pushCount;
                 }*/
-               return newState;
+               return buttonState;
             }else{
-                if (viewedStates.add(newState)){
-                    expand(newState, machine, pendingStates);
-                }
+                expand(buttonState, machine, pendingStates, viewedStates);
+                
             }
         }
         //return result;
     }
 
-    public static void expand(List<Integer> state, Machine machine, NavigableMap<Integer,List<FindStateWithHeuristic>> map){
+    public static void expand(List<Integer> state, Machine machine, NavigableMap<Integer,List<StateWithHeuristic>> map, Set<List<Integer>> viewedStates){
         var joltState=machine.calculateJoltState(state);
         var currentDistance=machine.calculateDistanceJoltageFromButtonState(state);
         for (var index=0;index<machine.buttons().size();index++) {
             var button=machine.buttons().get(index);
             if (state.get(index)>0){
+                
                 var action=new Action(index, -1);
-                var nextDistance=currentDistance+(button.size()*action.pushCount);
-                var findStateWithHeuristic=new FindStateWithHeuristic(countPush(state)-1, new FindState(state, action));
-                addStateToMap(findStateWithHeuristic,map);
+                var newState=action.apply(state);
+                if (viewedStates.add(newState)){
+                    var StateWithHeuristic=new StateWithHeuristic(estimate(newState, machine), newState);
+                    addStateToMap(StateWithHeuristic,map);
+                }
             }
 
             
@@ -89,32 +95,35 @@ public class Step2 {
                     .mapToInt(pos->machine.joltRequeriments().get(pos)-joltState.get(pos))
                     .min()
                     .orElse(0);
+            
             if (pushes>0){
                 var action=new Action(index, pushes);
-                var nextDistance=currentDistance+(button.size()*action.pushCount);
-                var findStateWithHeuristic=new FindStateWithHeuristic(countPush(state)+pushes, new FindState(state, action));
-                addStateToMap(findStateWithHeuristic,map);
+                var newState=action.apply(state);
+                if (viewedStates.add(newState)){
+                    var StateWithHeuristic=new StateWithHeuristic(estimate(newState, machine)+countPush(newState), newState);
+                    addStateToMap(StateWithHeuristic,map);
+                }
             }
 
             
         }
     }
 
-    private static void addStateToMap(FindStateWithHeuristic findStateWithHeuristic,
-            NavigableMap<Integer,List<FindStateWithHeuristic>> map) {
-        map.computeIfAbsent(findStateWithHeuristic.heuristic, (_)-> new ArrayList<FindStateWithHeuristic>());
-        map.get(findStateWithHeuristic.heuristic).add(findStateWithHeuristic);
+    private static void addStateToMap(StateWithHeuristic StateWithHeuristic,
+            NavigableMap<Integer,List<StateWithHeuristic>> map) {
+        map.computeIfAbsent(StateWithHeuristic.heuristic, (_)-> new ArrayList<StateWithHeuristic>());
+        map.get(StateWithHeuristic.heuristic).add(StateWithHeuristic);
+    }
+        
+    public static record FindState(List<Integer> state) {
+
     }
 
-    public static record FindState(List<Integer> state,  Action action) {
-
-    }
-
-    public static record FindStateWithHeuristic(int heuristic, FindState findState)
-            implements Comparable<FindStateWithHeuristic> {
+    public static record StateWithHeuristic(int heuristic, List<Integer> buttonState)
+            implements Comparable<StateWithHeuristic> {
 
         @Override
-        public int compareTo(FindStateWithHeuristic o) {
+        public int compareTo(StateWithHeuristic o) {
             return this.heuristic - o.heuristic;
         }
     }
@@ -131,5 +140,61 @@ public class Step2 {
 
     public static int countPush(List<Integer> state){
        return  state.stream().mapToInt(val->val).sum();
+    }
+
+    // public static int estimate(List<Integer> buttonState, Machine machine){
+    //     var joltState=machine.calculateJoltState(buttonState);
+    //     var pendingButtons=new ArrayList<>(machine.buttons());
+    //     int estimation=0;
+    //     record JoltStateAndPos(int pos,int joltState){};
+    //     var pendingJoltRequirements=IntStream.range(0, joltState.size())
+    //             .mapToObj(pos->new JoltStateAndPos(pos,machine.joltRequeriments().get(pos)-joltState.get(pos)))
+    //             .collect(Collectors.toList());
+    //     while (!pendingButtons.isEmpty() && !pendingJoltRequirements.isEmpty()){
+    //         var joltStateOptional=pendingJoltRequirements.stream()
+    //                 .max((j1,j2)->j1.joltState-j2.joltState);
+
+    //         if (joltStateOptional.isEmpty()){
+    //             break;
+    //         }
+    //         var joltStateAndPos=joltStateOptional.get();
+    //         pendingJoltRequirements.removeIf(js->js.pos==joltStateAndPos.pos);
+    //         estimation+=joltStateAndPos.joltState;
+    //         pendingButtons.removeIf(button->button.contains(joltStateAndPos.pos));
+            
+    //     }
+    //     return estimation;
+    // }
+
+    public static int estimate(List<Integer> buttonState, Machine machine){
+        buttonState=new ArrayList<>(buttonState);
+        var joltState=new AtomicReference<>(machine.calculateJoltState(buttonState));
+        var pendingButtons=new ArrayList<>(machine.buttons());
+        int estimation=0;
+
+        record ButtonAndPushes(List<Integer> button, int pushes){};
+        Set<Integer> affectedJolts=new HashSet<>();
+        while (!pendingButtons.isEmpty()){
+            joltState.set(machine.calculateJoltState(buttonState));
+            var buttonAndPushes= pendingButtons.stream()
+                .map(button->new ButtonAndPushes(button,button.stream()
+                    .mapToInt(pos->machine.joltRequeriments().get(pos)-joltState.get().get(pos))
+                    .min()
+                    .orElse(0)))
+                .max((bp1,bp2)->bp1.pushes-bp2.pushes)
+                .get();
+
+
+            if (affectedJolts.stream().noneMatch(jolt->buttonAndPushes.button.contains(jolt))){
+                var action=new Action(machine.buttons().indexOf(buttonAndPushes.button),buttonAndPushes.pushes);
+                buttonState=action.apply(buttonState);
+                affectedJolts.addAll(buttonAndPushes.button);
+                estimation+=action.pushCount;
+            }
+            
+            pendingButtons.remove(buttonAndPushes.button);
+            break;
+        }
+        return estimation;
     }
 }
